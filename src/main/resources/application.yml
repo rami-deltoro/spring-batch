@@ -5,17 +5,14 @@ spring:
     console:
       enabled: true
 
+
 datasource:
   batch:
-     username: sa
-     password:
-     jdbcUrl: jdbc:h2:mem:testdb
-     driverClassName: org.h2.Driver
+    username: ramideltoro
+    password: password
+    jdbcUrl: jdbc:mysql://localhost:3306/spring_batch
+    driverClassName: com.mysql.jdbc.Driver
+    platform: mysql
+    continueOnError: false
 
 
-#spring.datasource.url=jdbc:h2:mem:testdb
-#spring.datasource.driverClassName=org.h2.Driver
-#spring.datasource.username=sa
-#spring.datasource.password=
-
-#spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
