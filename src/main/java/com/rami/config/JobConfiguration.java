@@ -1,23 +1,21 @@
 package com.rami.config;
 
 import com.rami.model.Customer;
-import com.rami.rowmapper.CustomerRowMapper;
+import com.rami.rowmapper.CustomerFieldSetMapper;
 import com.rami.writer.MyItemWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.item.database.JdbcPagingItemReader;
-import org.springframework.batch.item.database.Order;
-import org.springframework.batch.item.database.support.MySqlPagingQueryProvider;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.mapping.DefaultLineMapper;
+import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 
-import javax.sql.DataSource;
-import java.util.HashMap;
-import java.util.Map;
 
 @Configuration
 @EnableBatchProcessing
@@ -31,35 +29,30 @@ public class JobConfiguration {
     private JobBuilderFactory jobBuilderFactory;
 
     @Autowired
-    private DataSource dataSource;
-
-    @Autowired
     private MyItemWriter myItemWriter;
 
 
-    /* Set Fetch size the same to the Chunk Size for performance.*/
     @Bean
-    public JdbcPagingItemReader<Customer> pagingItemReader() {
-        JdbcPagingItemReader<Customer> reader = new JdbcPagingItemReader<>();
+    public FlatFileItemReader<Customer> customerFlatFileItemReader() {
+        FlatFileItemReader<Customer> reader = new FlatFileItemReader<>();
 
-        reader.setDataSource(this.dataSource);
-        reader.setFetchSize(10);
-        reader.setRowMapper(new CustomerRowMapper());
+        reader.setLinesToSkip(1);
+        reader.setResource(new ClassPathResource("/data/customer.csv"));
 
-        MySqlPagingQueryProvider queryProvider = new MySqlPagingQueryProvider();
-        queryProvider.setSelectClause("id, firstName, lastName, birthdate");
-        queryProvider.setFromClause("from customer");
+        DefaultLineMapper<Customer> customerLineMapper = new DefaultLineMapper<>();
 
-        Map<String, Order> sortKeys = new HashMap<>(1);
+        DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
+        tokenizer.setNames(new String[] {"id", "firstName", "lastName", "birthdate"});
 
-        sortKeys.put("id", Order.ASCENDING);
+        customerLineMapper.setLineTokenizer(tokenizer);
+        customerLineMapper.setFieldSetMapper(new CustomerFieldSetMapper());/* There is a setter mapper where it sets the attributes through setters. Then no code is necessary to write.*/
+        customerLineMapper.afterPropertiesSet();
 
-        queryProvider.setSortKeys(sortKeys);
-
-        reader.setQueryProvider(queryProvider);
+        reader.setLineMapper(customerLineMapper);
 
         return reader;
     }
+
 
 
 
@@ -67,14 +60,14 @@ public class JobConfiguration {
     public Step step1() {
         return stepBuilderFactory.get("step1")
                 .<Customer,Customer>chunk(10)
-                .reader(pagingItemReader())
+                .reader(customerFlatFileItemReader())
                 .writer(myItemWriter)
                 .build();
     }
 
     @Bean
     public Job interfacesJob() {
-        return jobBuilderFactory.get("databaseJob1")
+        return jobBuilderFactory.get("flatFileJob")
                 .start(step1())
                 .build();
     }
