@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class MyItemWriter implements ItemWriter<Customer> {
+public class CustomerItemWriter implements ItemWriter<Customer> {
     @Override
     public void write(List<? extends Customer> list) throws Exception {
         list.forEach(customer -> System.out.println("Customer="+customer));

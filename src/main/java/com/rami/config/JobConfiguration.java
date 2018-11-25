@@ -1,21 +1,21 @@
 package com.rami.config;
 
 import com.rami.model.Customer;
-import com.rami.writer.MyItemWriter;
+import com.rami.writer.CustomerItemWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.item.xml.StaxEventItemReader;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.MultiResourceItemReader;
+import org.springframework.batch.item.file.mapping.DefaultLineMapper;
+import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.oxm.xstream.XStreamMarshaller;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.core.io.Resource;
 
 
 @Configuration
@@ -30,30 +30,39 @@ public class JobConfiguration {
     private JobBuilderFactory jobBuilderFactory;
 
     @Autowired
-    private MyItemWriter myItemWriter;
+    private CustomerItemWriter customerItemWriter;
+
+    @Value("classpath*:/data/customer*.csv")
+    private Resource[] inputFiles;
 
 
     @Bean
-    public StaxEventItemReader<Customer> customerXmlItemReader() {
+    public MultiResourceItemReader<Customer> multiResourceItemReader() {
+        MultiResourceItemReader<Customer> reader = new MultiResourceItemReader<>();
 
-        XStreamMarshaller unmarshaller = new XStreamMarshaller();
-
-        Map<String, Class> aliases = new HashMap<>();
-        aliases.put("customer", Customer.class);
-
-        unmarshaller.setAliases(aliases);
-
-        StaxEventItemReader<Customer> reader = new StaxEventItemReader<>();
-
-        reader.setResource(new ClassPathResource("/data/customers.xml"));
-        reader.setFragmentRootElementName("customer");
-        reader.setUnmarshaller(unmarshaller);
+        reader.setDelegate(customerItemReader());
+        reader.setResources(inputFiles);
 
         return reader;
     }
 
+    @Bean
+    public FlatFileItemReader<Customer> customerItemReader() {
+        FlatFileItemReader<Customer> reader = new FlatFileItemReader<>();
 
+        DefaultLineMapper<Customer> customerLineMapper = new DefaultLineMapper<>();
 
+        DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
+        tokenizer.setNames(new String[] {"id", "firstName", "lastName", "birthdate"});
+
+        customerLineMapper.setLineTokenizer(tokenizer);
+        customerLineMapper.setFieldSetMapper(new CustomerFieldSetMapper());
+        customerLineMapper.afterPropertiesSet();
+
+        reader.setLineMapper(customerLineMapper);
+
+        return reader;
+    }
 
 
 
@@ -61,14 +70,14 @@ public class JobConfiguration {
     public Step step1() {
         return stepBuilderFactory.get("step1")
                 .<Customer,Customer>chunk(10)
-                .reader(customerXmlItemReader())
-                .writer(myItemWriter)
+                .reader(multiResourceItemReader())
+                .writer(customerItemWriter)
                 .build();
     }
 
     @Bean
     public Job interfacesJob() {
-        return jobBuilderFactory.get("xmlFileJob")
+        return jobBuilderFactory.get("multiFileJob")
                 .start(step1())
                 .build();
     }
