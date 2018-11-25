@@ -1,7 +1,9 @@
 package com.rami.config;
 
 import com.rami.model.Customer;
+import com.rami.reader.StatefulItemReader;
 import com.rami.writer.CustomerItemWriter;
+import com.rami.writer.StringItemWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -17,6 +19,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 
+import java.util.ArrayList;
+import java.util.List;
+
 
 @Configuration
 @EnableBatchProcessing
@@ -30,54 +35,37 @@ public class JobConfiguration {
     private JobBuilderFactory jobBuilderFactory;
 
     @Autowired
-    private CustomerItemWriter customerItemWriter;
+    private StringItemWriter stringItemWriter;
 
-    @Value("classpath*:/data/customer*.csv")
-    private Resource[] inputFiles;
 
 
     @Bean
-    public MultiResourceItemReader<Customer> multiResourceItemReader() {
-        MultiResourceItemReader<Customer> reader = new MultiResourceItemReader<>();
+    public StatefulItemReader itemReader() {
+        List<String> items = new ArrayList<>(100);
 
-        reader.setDelegate(customerItemReader());
-        reader.setResources(inputFiles);
+        for(int i=0;i<=100;i++) {
+            items.add(String.valueOf(i));
+        }
 
-        return reader;
+        return new StatefulItemReader(items);
     }
 
-    @Bean
-    public FlatFileItemReader<Customer> customerItemReader() {
-        FlatFileItemReader<Customer> reader = new FlatFileItemReader<>();
-
-        DefaultLineMapper<Customer> customerLineMapper = new DefaultLineMapper<>();
-
-        DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
-        tokenizer.setNames(new String[] {"id", "firstName", "lastName", "birthdate"});
-
-        customerLineMapper.setLineTokenizer(tokenizer);
-        customerLineMapper.setFieldSetMapper(new CustomerFieldSetMapper());
-        customerLineMapper.afterPropertiesSet();
-
-        reader.setLineMapper(customerLineMapper);
-
-        return reader;
-    }
 
 
 
     @Bean
     public Step step1() {
         return stepBuilderFactory.get("step1")
-                .<Customer,Customer>chunk(10)
-                .reader(multiResourceItemReader())
-                .writer(customerItemWriter)
+                .<String,String>chunk(10)
+                .reader(itemReader())
+                .writer(stringItemWriter)
+                .stream(itemReader())
                 .build();
     }
 
     @Bean
     public Job interfacesJob() {
-        return jobBuilderFactory.get("multiFileJob")
+        return jobBuilderFactory.get("statefulJob")
                 .start(step1())
                 .build();
     }
